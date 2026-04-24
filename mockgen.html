@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MockGen</title>
+<style>
+  :root {
+    --bg: #0e1014;
+    --panel: #171a21;
+    --panel-2: #1e222b;
+    --border: #2a2f3a;
+    --text: #e6e8ec;
+    --muted: #8a92a3;
+    --accent: #6ea8ff;
+    --accent-2: #4f8ef7;
+    --green: #5dd39e;
+    --amber: #f5c16c;
+    --red: #ff6b6b;
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; font-size: 14px; line-height: 1.5; }
+  .wrap { max-width: 960px; margin: 0 auto; padding: 28px 24px 80px; }
+
+  header { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 24px; padding-bottom: 20px; border-bottom: 1px solid var(--border); }
+  h1 { margin: 0; font-size: 22px; letter-spacing: -0.01em; }
+  h1 .sub { font-weight: 400; color: var(--muted); font-size: 13px; margin-left: 8px; }
+  .sw-status { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
+  .sw-status .dot { width: 8px; height: 8px; border-radius: 50%; background: #555; }
+  .sw-status.active .dot { background: var(--green); box-shadow: 0 0 0 3px rgba(93, 211, 158, 0.15); }
+  .sw-status.error .dot { background: var(--red); }
+
+  .row { display: flex; gap: 12px; align-items: center; }
+  button, .btn { font: inherit; color: var(--text); background: var(--panel-2); border: 1px solid var(--border); padding: 8px 14px; border-radius: 6px; cursor: pointer; transition: background 0.15s, border-color 0.15s; }
+  button:hover, .btn:hover { background: #252a35; border-color: #3a4150; }
+  button.primary { background: var(--accent-2); border-color: var(--accent-2); color: white; }
+  button.primary:hover { background: var(--accent); border-color: var(--accent); }
+  button.success { background: var(--green); border-color: var(--green); color: #0b1a14; }
+  button.success:hover { filter: brightness(1.05); }
+  button.ghost { background: transparent; }
+  button.danger { color: var(--red); }
+  button.danger:hover { background: rgba(255, 107, 107, 0.08); border-color: rgba(255, 107, 107, 0.4); }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  input[type="text"], input[type="password"], textarea, select {
+    font: inherit; color: var(--text); background: var(--bg); border: 1px solid var(--border); padding: 8px 10px; border-radius: 6px; outline: none; transition: border-color 0.15s;
+  }
+  input:focus, textarea:focus, select:focus { border-color: var(--accent); }
+  textarea { resize: vertical; font-family: var(--mono); font-size: 13px; min-height: 80px; width: 100%; }
+  select { padding-right: 28px; appearance: none; background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath fill='%238a92a3' d='M0 0l5 6 5-6z'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 10px center; }
+
+  .key-row { display: flex; gap: 8px; align-items: center; }
+  .key-row input { flex: 1; max-width: 360px; font-family: var(--mono); font-size: 12px; }
+  .key-hint { color: var(--muted); font-size: 12px; margin-top: 6px; }
+  .key-hint a { color: var(--accent); text-decoration: none; }
+  .key-hint a:hover { text-decoration: underline; }
+
+  .toolbar { display: flex; justify-content: space-between; align-items: center; margin: 20px 0 14px; }
+  .toolbar h2 { margin: 0; font-size: 15px; color: var(--muted); font-weight: 500; }
+
+  .endpoint { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; margin-bottom: 10px; overflow: hidden; transition: border-color 0.15s; }
+  .endpoint:hover { border-color: #3a4150; }
+  .endpoint.open { border-color: var(--accent); }
+
+  .ep-head { display: flex; align-items: center; gap: 12px; padding: 12px 14px; cursor: pointer; }
+  .method { font-family: var(--mono); font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 4px; min-width: 52px; text-align: center; letter-spacing: 0.02em; }
+  .method.GET { background: rgba(110, 168, 255, 0.15); color: var(--accent); }
+  .method.POST { background: rgba(93, 211, 158, 0.15); color: var(--green); }
+  .method.PUT { background: rgba(245, 193, 108, 0.15); color: var(--amber); }
+  .method.PATCH { background: rgba(245, 193, 108, 0.15); color: var(--amber); }
+  .method.DELETE { background: rgba(255, 107, 107, 0.15); color: var(--red); }
+  .path { font-family: var(--mono); font-size: 13px; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ep-desc { color: var(--muted); font-size: 12px; flex: 2; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  .badge { font-size: 11px; padding: 2px 8px; border-radius: 10px; font-weight: 500; }
+  .badge.draft { background: var(--panel-2); color: var(--muted); }
+  .badge.generated { background: rgba(245, 193, 108, 0.15); color: var(--amber); }
+  .badge.approved { background: rgba(93, 211, 158, 0.15); color: var(--green); }
+
+  .ep-body { border-top: 1px solid var(--border); padding: 16px; display: none; background: var(--panel-2); }
+  .endpoint.open .ep-body { display: block; }
+
+  .field { margin-bottom: 14px; }
+  .field label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+  .field-row { display: flex; gap: 8px; }
+  .field-row .path-input { flex: 1; font-family: var(--mono); }
+
+  .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+  .actions .spacer { flex: 1; }
+
+  .preview { background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 12px; max-height: 380px; overflow: auto; font-family: var(--mono); font-size: 12px; white-space: pre; margin-top: 10px; }
+  .preview.empty { color: var(--muted); font-style: italic; white-space: normal; font-family: inherit; text-align: center; padding: 24px; }
+
+  .empty-state { text-align: center; padding: 60px 20px; color: var(--muted); }
+  .empty-state h3 { color: var(--text); margin: 0 0 8px; font-size: 16px; }
+
+  .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: var(--panel); border: 1px solid var(--border); padding: 10px 16px; border-radius: 6px; font-size: 13px; box-shadow: 0 6px 20px rgba(0,0,0,0.4); opacity: 0; transition: opacity 0.2s, transform 0.2s; pointer-events: none; }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(-4px); }
+  .toast.error { border-color: var(--red); color: var(--red); }
+  .toast.success { border-color: var(--green); color: var(--green); }
+
+  .spinner { display: inline-block; width: 12px; height: 12px; border: 2px solid currentColor; border-top-color: transparent; border-radius: 50%; animation: spin 0.6s linear infinite; vertical-align: -2px; margin-right: 6px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .err-msg { color: var(--red); font-size: 12px; margin-top: 8px; font-family: var(--mono); word-break: break-word; }
+
+  details summary { cursor: pointer; color: var(--muted); font-size: 12px; margin-top: 10px; }
+  details summary:hover { color: var(--text); }
+
+  .help { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; margin-bottom: 24px; }
+  .help summary { list-style: none; padding: 12px 16px; font-size: 13px; color: var(--text); display: flex; align-items: center; gap: 8px; margin: 0; }
+  .help summary::-webkit-details-marker { display: none; }
+  .help summary::before { content: "▸"; color: var(--muted); transition: transform 0.15s; display: inline-block; }
+  .help[open] summary::before { transform: rotate(90deg); }
+  .help .body { padding: 0 16px 16px; color: var(--muted); font-size: 13px; border-top: 1px solid var(--border); padding-top: 14px; }
+  .help ol { margin: 8px 0 14px; padding-left: 20px; }
+  .help li { margin-bottom: 6px; }
+  .help code { background: var(--bg); padding: 1px 6px; border-radius: 3px; font-family: var(--mono); font-size: 12px; color: var(--text); }
+  .help strong { color: var(--text); font-weight: 500; }
+  .help .status-ref { display: inline-block; margin: 0 2px; }
+
+  [title] { position: relative; }
+  .hint { color: var(--muted); font-size: 12px; margin-top: 4px; line-height: 1.4; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div>
+    <h1>MockGen<span class="sub">— browser-native mock API</span></h1>
+  </div>
+  <div id="sw-status" class="sw-status" title="Service worker status. Must be active for mocks to be served."><span class="dot"></span><span class="label">registering…</span></div>
+</header>
+
+<details class="help" id="help-panel">
+  <summary>How this works</summary>
+  <div class="body">
+    <ol>
+      <li>Paste your <strong>Gemini API key</strong> below. It's saved to <code>localStorage</code> and only sent to Google.</li>
+      <li>Click <strong>+ New endpoint</strong>, set the method + path, and describe the data you want.</li>
+      <li>Click <strong>Generate</strong>. Review the JSON. <strong>Approve</strong> it to go live, or Generate again to retry.</li>
+      <li>Any page on this same origin that calls <code>fetch('/your/path')</code> will receive the approved mock — your app needs no changes.</li>
+    </ol>
+    <div>Statuses: <span class="badge draft status-ref">draft</span> no data yet · <span class="badge generated status-ref">generated</span> review it · <span class="badge approved status-ref">approved</span> live.</div>
+    <div style="margin-top:10px">Editing method, path, or description un-approves the mock so you can't accidentally serve stale data.</div>
+  </div>
+</details>
+
+<section class="field">
+  <label title="Used to call Gemini from your browser. Never sent anywhere else.">Gemini API key</label>
+  <div class="key-row">
+    <input type="password" id="api-key" placeholder="AIza…" autocomplete="off" spellcheck="false" title="Paste your Gemini API key here">
+    <button id="save-key" title="Save key to localStorage">Save</button>
+    <button id="clear-key" class="ghost" title="Remove the stored key">Clear</button>
+  </div>
+  <div class="key-hint">Stored in localStorage, never leaves the browser. Get one at <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a>.</div>
+</section>
+
+<div class="toolbar">
+  <h2>Endpoints</h2>
+  <button class="primary" id="new-endpoint" title="Add a new mock endpoint">+ New endpoint</button>
+</div>
+
+<div id="endpoints"></div>
+
+<div id="empty-state" class="empty-state" style="display:none">
+  <h3>No endpoints yet</h3>
+  <div>Click <strong>+ New endpoint</strong> above to define one.</div>
+  <div style="margin-top:12px;font-size:12px">Example: <code style="background:var(--panel);padding:2px 6px;border-radius:3px;font-family:var(--mono)">GET /api/users</code> → <em>"10 users with id, name, email, role"</em></div>
+</div>
+
+</div>
+
+<div id="toast" class="toast"></div>
+
+<script>
+const MODEL = 'gemini-2.5-flash';
+const LS_KEY = 'mockgen.apiKey';
+const LS_ENDPOINTS = 'mockgen.endpoints';
+
+const DB_NAME = 'mockgen';
+const DB_VERSION = 1;
+const STORE = 'mocks';
+
+function openDB() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(DB_NAME, DB_VERSION);
+    req.onupgradeneeded = () => {
+      const db = req.result;
+      if (!db.objectStoreNames.contains(STORE)) db.createObjectStore(STORE, { keyPath: 'key' });
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+async function putMock(method, path, response, approved) {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE, 'readwrite');
+    tx.objectStore(STORE).put({ key: `${method} ${path}`, method, path, response, approved });
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+async function deleteMock(method, path) {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE, 'readwrite');
+    tx.objectStore(STORE).delete(`${method} ${path}`);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+async function syncAllToDB(endpoints) {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE, 'readwrite');
+    const store = tx.objectStore(STORE);
+    store.clear();
+    for (const ep of endpoints) {
+      if (ep.method && ep.path) {
+        store.put({ key: `${ep.method} ${ep.path}`, method: ep.method, path: ep.path, response: ep.response, approved: !!ep.approved });
+      }
+    }
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+const state = {
+  endpoints: loadEndpoints(),
+  openId: null,
+};
+
+function loadEndpoints() {
+  try { return JSON.parse(localStorage.getItem(LS_ENDPOINTS) || '[]'); }
+  catch { return []; }
+}
+
+function saveEndpoints() {
+  localStorage.setItem(LS_ENDPOINTS, JSON.stringify(state.endpoints));
+  syncAllToDB(state.endpoints).catch(err => console.error('[MockGen] sync error', err));
+}
+
+function uid() { return Math.random().toString(36).slice(2, 10); }
+
+function toast(msg, kind) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = 'toast show' + (kind ? ' ' + kind : '');
+  clearTimeout(toast._t);
+  toast._t = setTimeout(() => { el.className = 'toast' + (kind ? ' ' + kind : ''); }, 2400);
+}
+
+function statusOf(ep) {
+  if (ep.approved) return 'approved';
+  if (ep.response !== undefined && ep.response !== null) return 'generated';
+  return 'draft';
+}
+
+function escapeHTML(s) {
+  return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+}
+
+function render() {
+  const container = document.getElementById('endpoints');
+  const empty = document.getElementById('empty-state');
+  if (!state.endpoints.length) {
+    container.innerHTML = '';
+    empty.style.display = '';
+    return;
+  }
+  empty.style.display = 'none';
+  container.innerHTML = state.endpoints.map(ep => {
+    const status = statusOf(ep);
+    const open = state.openId === ep.id ? 'open' : '';
+    const preview = ep.response !== undefined && ep.response !== null
+      ? `<div class="preview">${escapeHTML(JSON.stringify(ep.response, null, 2))}</div>`
+      : `<div class="preview empty">No response yet. Describe the data below and click Generate.</div>`;
+    const badgeTitle = status === 'approved'
+      ? 'Live — this mock is being served to your app'
+      : status === 'generated'
+        ? 'Generated but not yet approved. Review the JSON below and click Approve.'
+        : 'No response yet. Describe the data and click Generate.';
+    return `
+      <div class="endpoint ${open}" data-id="${ep.id}">
+        <div class="ep-head" data-action="toggle" title="Click to ${state.openId === ep.id ? 'collapse' : 'expand'}">
+          <span class="method ${ep.method}" title="HTTP method">${ep.method}</span>
+          <span class="path" title="Request path">${escapeHTML(ep.path || '(no path)')}</span>
+          <span class="ep-desc" title="${escapeHTML(ep.description || '')}">${escapeHTML(ep.description || '')}</span>
+          <span class="badge ${status}" title="${badgeTitle}">${status}</span>
+        </div>
+        <div class="ep-body">
+          <div class="field">
+            <label>Method & path <span class="hint" style="display:inline;margin-left:6px">— the URL your app will fetch</span></label>
+            <div class="field-row">
+              <select data-field="method" title="HTTP method to match">
+                ${['GET','POST','PUT','PATCH','DELETE'].map(m => `<option ${ep.method === m ? 'selected' : ''}>${m}</option>`).join('')}
+              </select>
+              <input type="text" class="path-input" data-field="path" value="${escapeHTML(ep.path || '')}" placeholder="/api/users" title="Must start with / — exact match, no path parameters yet">
+            </div>
+          </div>
+          <div class="field">
+            <label>Describe the data <span class="hint" style="display:inline;margin-left:6px">— plain English, be specific about fields and counts</span></label>
+            <textarea data-field="description" placeholder="10 users with id, name, email, role (admin/editor/viewer), last_login ISO date" title="What JSON should this endpoint return? Mention field names, types, and how many items.">${escapeHTML(ep.description || '')}</textarea>
+          </div>
+          <div class="actions">
+            <button class="primary" data-action="generate" title="Call Gemini to generate JSON matching your description">Generate</button>
+            ${ep.response !== undefined && ep.response !== null ? `<button class="success" data-action="approve" title="Make this mock live. Your app will receive this JSON on matching fetches.">${ep.approved ? 'Re-approve' : 'Approve'}</button>` : ''}
+            <div class="spacer"></div>
+            <button class="danger" data-action="delete" title="Remove this endpoint">Delete</button>
+          </div>
+          ${preview}
+          ${ep.error ? `<div class="err-msg">${escapeHTML(ep.error)}</div>` : ''}
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function findEp(id) { return state.endpoints.find(e => e.id === id); }
+
+document.getElementById('endpoints').addEventListener('click', async (e) => {
+  const card = e.target.closest('.endpoint');
+  if (!card) return;
+  const id = card.dataset.id;
+  const ep = findEp(id);
+  if (!ep) return;
+  const action = e.target.dataset.action || e.target.closest('[data-action]')?.dataset.action;
+
+  if (action === 'toggle') {
+    state.openId = state.openId === id ? null : id;
+    render();
+    return;
+  }
+  if (action === 'delete') {
+    if (!confirm('Delete this endpoint?')) return;
+    await deleteMock(ep.method, ep.path).catch(() => {});
+    state.endpoints = state.endpoints.filter(x => x.id !== id);
+    saveEndpoints();
+    render();
+    return;
+  }
+  if (action === 'generate') {
+    await generate(ep, card);
+    return;
+  }
+  if (action === 'approve') {
+    ep.approved = true;
+    delete ep.error;
+    saveEndpoints();
+    render();
+    toast('Approved — mock is live', 'success');
+    return;
+  }
+});
+
+document.getElementById('endpoints').addEventListener('input', (e) => {
+  const card = e.target.closest('.endpoint');
+  if (!card) return;
+  const ep = findEp(card.dataset.id);
+  if (!ep) return;
+  const field = e.target.dataset.field;
+  if (!field) return;
+  const oldKey = `${ep.method} ${ep.path}`;
+  ep[field] = e.target.value;
+  const newKey = `${ep.method} ${ep.path}`;
+  if (field === 'method' || field === 'path') {
+    if (oldKey !== newKey) {
+      deleteMock(oldKey.split(' ')[0], oldKey.split(' ').slice(1).join(' ')).catch(() => {});
+    }
+    ep.approved = false;
+    const head = card.querySelector('.ep-head');
+    head.querySelector('.method').className = 'method ' + ep.method;
+    head.querySelector('.method').textContent = ep.method;
+    head.querySelector('.path').textContent = ep.path || '(no path)';
+    head.querySelector('.badge').className = 'badge ' + statusOf(ep);
+    head.querySelector('.badge').textContent = statusOf(ep);
+  }
+  if (field === 'description') {
+    card.querySelector('.ep-desc').textContent = ep.description;
+  }
+  saveEndpoints();
+});
+
+document.getElementById('new-endpoint').addEventListener('click', () => {
+  const ep = { id: uid(), method: 'GET', path: '', description: '', response: null, approved: false };
+  state.endpoints.unshift(ep);
+  state.openId = ep.id;
+  saveEndpoints();
+  render();
+});
+
+async function generate(ep, card) {
+  const apiKey = localStorage.getItem(LS_KEY);
+  if (!apiKey) { toast('Enter your Gemini API key first', 'error'); return; }
+  if (!ep.path || !ep.path.startsWith('/')) { toast('Path must start with /', 'error'); return; }
+  if (!ep.description.trim()) { toast('Add a description of the data', 'error'); return; }
+
+  const btn = card.querySelector('[data-action="generate"]');
+  const originalText = btn.textContent;
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>Generating…';
+  delete ep.error;
+
+  const prompt = `You are generating mock JSON data for an HTTP API endpoint used in development/testing.
+
+Endpoint: ${ep.method} ${ep.path}
+
+Requested data:
+${ep.description}
+
+Requirements:
+- Return ONLY valid JSON — no prose, no markdown fences, no commentary.
+- Structure the response as a typical REST API would return it.
+- Use realistic-looking sample values (real-seeming names, emails, dates, IDs).
+- If the user asks for a list, return an array (or an object wrapping an array if conventional).
+- Keep the response reasonably sized unless a specific count is given.`;
+
+  try {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${encodeURIComponent(apiKey)}`;
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: { responseMimeType: 'application/json', temperature: 0.7 },
+      }),
+    });
+    if (!res.ok) {
+      const text = await res.text();
+      let msg = `Gemini error ${res.status}`;
+      try { const j = JSON.parse(text); msg = j.error?.message || msg; } catch {}
+      throw new Error(msg);
+    }
+    const data = await res.json();
+    const parts = data.candidates?.[0]?.content?.parts || [];
+    const text = parts.map(p => p.text || '').join('').trim();
+    if (!text) {
+      const finish = data.candidates?.[0]?.finishReason;
+      const block = data.promptFeedback?.blockReason;
+      throw new Error('Empty response from Gemini' + (finish ? ` (finishReason: ${finish})` : '') + (block ? ` (blocked: ${block})` : ''));
+    }
+    let cleaned = text;
+    if (cleaned.startsWith('```')) {
+      cleaned = cleaned.replace(/^```(?:json|JSON)?\s*\n?/, '').replace(/\n?```\s*$/, '').trim();
+    }
+    const firstBrace = cleaned.search(/[\[{]/);
+    if (firstBrace > 0) cleaned = cleaned.slice(firstBrace);
+    let parsed;
+    try { parsed = JSON.parse(cleaned); }
+    catch (e) {
+      const snippet = text.length > 300 ? text.slice(0, 300) + '…' : text;
+      throw new Error('Gemini returned invalid JSON: ' + e.message + ' — got: ' + snippet);
+    }
+    ep.response = parsed;
+    ep.approved = false;
+    saveEndpoints();
+    render();
+    toast('Generated — review and approve to go live', 'success');
+  } catch (err) {
+    ep.error = err.message;
+    render();
+    toast(err.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = originalText;
+  }
+}
+
+const apiKeyInput = document.getElementById('api-key');
+apiKeyInput.value = localStorage.getItem(LS_KEY) || '';
+if (!apiKeyInput.value && !state.endpoints.length) {
+  document.getElementById('help-panel').open = true;
+}
+document.getElementById('save-key').addEventListener('click', () => {
+  const v = apiKeyInput.value.trim();
+  if (!v) { toast('Key is empty', 'error'); return; }
+  localStorage.setItem(LS_KEY, v);
+  toast('Key saved', 'success');
+});
+document.getElementById('clear-key').addEventListener('click', () => {
+  localStorage.removeItem(LS_KEY);
+  apiKeyInput.value = '';
+  toast('Key cleared');
+});
+
+async function registerSW() {
+  const status = document.getElementById('sw-status');
+  const setStatus = (cls, label) => {
+    status.className = 'sw-status ' + cls;
+    status.querySelector('.label').textContent = label;
+  };
+  if (!('serviceWorker' in navigator)) {
+    setStatus('error', 'service worker unsupported');
+    return;
+  }
+  try {
+    const swPath = new URL('sw-mockgen.js', location.href).pathname;
+    const reg = await navigator.serviceWorker.register(swPath, { scope: './' });
+    await navigator.serviceWorker.ready;
+    setStatus('active', 'active — intercepting fetch');
+    await syncAllToDB(state.endpoints);
+  } catch (err) {
+    console.error(err);
+    setStatus('error', 'failed to register: ' + err.message);
+  }
+}
+
+render();
+registerSW();
+</script>
+</body>
+</html>
