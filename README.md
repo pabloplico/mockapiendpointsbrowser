@@ -67,6 +67,22 @@ Then open `https://yourapp.username.repl.co/mockgen.html` to manage mocks, and u
 
 Changing method, path, or description un-approves the mock automatically, so you never accidentally serve stale data.
 
+## Basic vs Advanced mode
+
+A toggle in the header switches between two tiers:
+
+- **Basic** — essential controls only: method, path, description, Generate, Approve.
+- **Advanced** — adds per-endpoint tooling. More will land here over time.
+
+### Scenarios (Advanced)
+
+Once a mock is approved, a scenario row appears on the endpoint card with four options. Each is served with an `X-MockGen-Scenario` header so your app code can tell which variant came back if it cares.
+
+- **Normal** — returns the approved JSON with status 200.
+- **Empty** — returns an auto-derived empty version (e.g. `[]`, or `{data: []}` if the original was `{data: [...]}`) with status 200. Useful for previewing empty states.
+- **Error** — returns status 500 with a generic error body. Useful for testing error UI.
+- **Loading** — hangs the response for 5 minutes. Useful for previewing loading/skeleton states. Refresh the app tab to cancel.
+
 ## Works with
 
 - Any web framework (React, Vue, Svelte, plain HTML)

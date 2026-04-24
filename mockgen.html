@@ -26,10 +26,28 @@
   header { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 24px; padding-bottom: 20px; border-bottom: 1px solid var(--border); }
   h1 { margin: 0; font-size: 22px; letter-spacing: -0.01em; }
   h1 .sub { font-weight: 400; color: var(--muted); font-size: 13px; margin-left: 8px; }
-  .header-right { display: flex; align-items: center; gap: 16px; }
+  .header-right { display: flex; align-items: center; gap: 12px; }
+
+  .mode-toggle { display: inline-flex; background: var(--panel-2); border: 1px solid var(--border); border-radius: 6px; padding: 2px; }
+  .mode-toggle button { background: transparent; border: none; padding: 4px 10px; font-size: 12px; color: var(--muted); border-radius: 4px; cursor: pointer; transition: color 0.15s, background 0.15s; font-family: inherit; }
+  .mode-toggle button.active { background: var(--bg); color: var(--text); }
+  .mode-toggle button:hover:not(.active) { color: var(--text); }
+
+  body:not(.mode-advanced) .adv-only { display: none !important; }
+
   .gh-link { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); text-decoration: none; padding: 4px 8px; border-radius: 4px; transition: color 0.15s, background 0.15s; }
   .gh-link:hover { color: var(--text); background: var(--panel-2); }
   .gh-link svg { display: block; }
+
+  .key-toggle { position: relative; display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; background: transparent; border: 1px solid var(--border); border-radius: 6px; color: var(--muted); cursor: pointer; padding: 0; transition: color 0.15s, background 0.15s, border-color 0.15s; }
+  .key-toggle:hover { color: var(--text); background: var(--panel-2); border-color: #3a4150; }
+  .key-toggle.has-key { color: var(--green); }
+  .key-toggle.active { background: var(--panel-2); color: var(--text); border-color: var(--accent); }
+  .key-toggle svg { display: block; }
+  .key-toggle .status-dot { position: absolute; top: 4px; right: 4px; width: 6px; height: 6px; border-radius: 50%; background: var(--green); display: none; }
+  .key-toggle.has-key .status-dot { display: block; }
+
+  #key-section.collapsed { display: none; }
   .sw-status { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
   .sw-status .dot { width: 8px; height: 8px; border-radius: 50%; background: #555; }
   .sw-status.active .dot { background: var(--green); box-shadow: 0 0 0 3px rgba(93, 211, 158, 0.15); }
@@ -126,6 +144,18 @@
 
   [title] { position: relative; }
   .hint { color: var(--muted); font-size: 12px; margin-top: 4px; line-height: 1.4; }
+
+  .scenario-row { display: flex; align-items: center; gap: 10px; margin-top: 14px; padding: 10px 12px; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; flex-wrap: wrap; }
+  .scenario-row > .label { font-size: 12px; color: var(--muted); margin-right: 2px; }
+  .scenario-picker { display: inline-flex; background: var(--panel); border: 1px solid var(--border); border-radius: 6px; padding: 2px; }
+  .scenario-picker button { background: transparent; border: none; padding: 4px 10px; font-size: 12px; color: var(--muted); border-radius: 4px; cursor: pointer; font-family: inherit; transition: color 0.15s, background 0.15s; }
+  .scenario-picker button:hover:not(.active) { color: var(--text); }
+  .scenario-picker button.active { background: var(--panel-2); color: var(--text); }
+  .scenario-picker button.active[data-scenario="empty"] { color: var(--amber); }
+  .scenario-picker button.active[data-scenario="error"] { color: var(--red); }
+  .scenario-picker button.active[data-scenario="loading"] { color: var(--accent); }
+  .scenario-picker button.active[data-scenario="normal"] { color: var(--green); }
+  .scenario-note { font-size: 12px; color: var(--muted); flex: 1; min-width: 200px; }
 </style>
 </head>
 <body>
@@ -136,6 +166,14 @@
     <h1>MockGen<span class="sub">— browser-native mock API</span></h1>
   </div>
   <div class="header-right">
+    <div class="mode-toggle" id="mode-toggle" role="tablist" title="Basic: essential controls only. Advanced: adds scenarios, latency, request log, import/export, and more.">
+      <button data-mode="basic" role="tab" title="Essential controls only">Basic</button>
+      <button data-mode="advanced" role="tab" title="All features">Advanced</button>
+    </div>
+    <button class="key-toggle" id="key-toggle" title="Gemini API key" aria-label="Toggle API key editor">
+      <svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor" aria-hidden="true"><path d="M10.5 1a4.5 4.5 0 0 0-4.286 5.9L.146 12.96a.5.5 0 0 0-.146.354V15a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1v-1h1a1 1 0 0 0 1-1v-1h1a.5.5 0 0 0 .354-.146l.328-.329A4.5 4.5 0 1 0 10.5 1zm1.5 4a1 1 0 1 1 0-2 1 1 0 0 1 0 2z"/></svg>
+      <span class="status-dot" aria-hidden="true"></span>
+    </button>
     <a class="gh-link" href="https://github.com/pabloplico/mockapiendpointsbrowser" target="_blank" rel="noopener" title="View on GitHub">
       <svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.012 8.012 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
       GitHub
@@ -155,10 +193,11 @@
     </ol>
     <div>Statuses: <span class="badge draft status-ref">draft</span> no data yet · <span class="badge generated status-ref">generated</span> review it · <span class="badge approved status-ref">approved</span> live.</div>
     <div style="margin-top:10px">Editing method, path, or description un-approves the mock so you can't accidentally serve stale data.</div>
+    <div class="adv-only" style="margin-top:10px"><strong>Scenarios:</strong> once a mock is approved, flip between <em>Normal</em>, <em>Empty</em>, <em>Error</em>, and <em>Loading</em> to preview each UI state without rewriting the JSON.</div>
   </div>
 </details>
 
-<section class="field">
+<section class="field" id="key-section">
   <label title="Used to call Gemini from your browser. Never sent anywhere else.">Gemini API key</label>
   <div class="key-row">
     <input type="password" id="api-key" placeholder="AIza…" autocomplete="off" spellcheck="false" title="Paste your Gemini API key here">
@@ -189,6 +228,7 @@
 const MODEL = 'gemini-2.5-flash';
 const LS_KEY = 'mockgen.apiKey';
 const LS_ENDPOINTS = 'mockgen.endpoints';
+const LS_MODE = 'mockgen.mode';
 
 const DB_NAME = 'mockgen';
 const DB_VERSION = 1;
@@ -234,7 +274,7 @@ async function syncAllToDB(endpoints) {
     store.clear();
     for (const ep of endpoints) {
       if (ep.method && ep.path) {
-        store.put({ key: `${ep.method} ${ep.path}`, method: ep.method, path: ep.path, response: ep.response, approved: !!ep.approved });
+        store.put({ key: `${ep.method} ${ep.path}`, method: ep.method, path: ep.path, response: ep.response, approved: !!ep.approved, scenario: ep.scenario || 'normal' });
       }
     }
     tx.oncomplete = () => resolve();
@@ -297,6 +337,21 @@ function render() {
       : status === 'generated'
         ? 'Generated but not yet approved. Review the JSON below and click Approve.'
         : 'No response yet. Describe the data and click Generate.';
+    const scenario = ep.scenario || 'normal';
+    const scenarioNotes = {
+      normal: 'Returns the approved JSON with status 200.',
+      empty: 'Returns an auto-derived empty version — good for previewing empty states.',
+      error: 'Returns status 500 with a generic error body — good for testing error UI.',
+      loading: 'Hangs for 5 minutes — good for testing loading/skeleton states. Refresh the app to cancel.',
+    };
+    const scenarioPicker = status === 'approved' ? `
+          <div class="scenario-row adv-only">
+            <span class="label">Scenario:</span>
+            <div class="scenario-picker">
+              ${['normal','empty','error','loading'].map(s => `<button data-action="scenario" data-scenario="${s}" class="${scenario === s ? 'active' : ''}" title="${scenarioNotes[s]}">${s[0].toUpperCase() + s.slice(1)}</button>`).join('')}
+            </div>
+            <span class="scenario-note">${scenarioNotes[scenario]}</span>
+          </div>` : '';
     return `
       <div class="endpoint ${open}" data-id="${ep.id}">
         <div class="ep-head" data-action="toggle" title="Click to ${state.openId === ep.id ? 'collapse' : 'expand'}">
@@ -326,6 +381,7 @@ function render() {
             <button class="danger" data-action="delete" title="Remove this endpoint">Delete</button>
           </div>
           ${preview}
+          ${scenarioPicker}
           ${ep.error ? `<div class="err-msg">${escapeHTML(ep.error)}</div>` : ''}
         </div>
       </div>
@@ -362,10 +418,21 @@ document.getElementById('endpoints').addEventListener('click', async (e) => {
   }
   if (action === 'approve') {
     ep.approved = true;
+    if (!ep.scenario) ep.scenario = 'normal';
     delete ep.error;
     saveEndpoints();
     render();
     toast('Approved — mock is live', 'success');
+    return;
+  }
+  if (action === 'scenario') {
+    const btn = e.target.closest('[data-scenario]');
+    const s = btn?.dataset.scenario;
+    if (!s) return;
+    ep.scenario = s;
+    saveEndpoints();
+    render();
+    toast(`Scenario: ${s}`, s === 'normal' ? 'success' : null);
     return;
   }
 });
@@ -484,20 +551,42 @@ Requirements:
 }
 
 const apiKeyInput = document.getElementById('api-key');
+const keySection = document.getElementById('key-section');
+const keyToggleBtn = document.getElementById('key-toggle');
 apiKeyInput.value = localStorage.getItem(LS_KEY) || '';
 if (!apiKeyInput.value && !state.endpoints.length) {
   document.getElementById('help-panel').open = true;
 }
+
+function syncKeyUI() {
+  const hasKey = !!localStorage.getItem(LS_KEY);
+  keyToggleBtn.classList.toggle('has-key', hasKey);
+  keyToggleBtn.title = hasKey ? 'Gemini API key saved — click to edit' : 'Gemini API key required — click to add';
+  keySection.classList.toggle('collapsed', hasKey);
+}
+keyToggleBtn.addEventListener('click', () => {
+  const collapsed = keySection.classList.toggle('collapsed');
+  keyToggleBtn.classList.toggle('active', !collapsed);
+  if (!collapsed) apiKeyInput.focus();
+});
+syncKeyUI();
+
 document.getElementById('save-key').addEventListener('click', () => {
   const v = apiKeyInput.value.trim();
   if (!v) { toast('Key is empty', 'error'); return; }
   localStorage.setItem(LS_KEY, v);
   toast('Key saved', 'success');
+  keyToggleBtn.classList.remove('active');
+  syncKeyUI();
 });
 document.getElementById('clear-key').addEventListener('click', () => {
   localStorage.removeItem(LS_KEY);
   apiKeyInput.value = '';
   toast('Key cleared');
+  syncKeyUI();
+  keySection.classList.remove('collapsed');
+  keyToggleBtn.classList.add('active');
+  apiKeyInput.focus();
 });
 
 async function registerSW() {
@@ -521,6 +610,20 @@ async function registerSW() {
     setStatus('error', 'failed to register: ' + err.message);
   }
 }
+
+function applyMode(mode) {
+  document.body.classList.toggle('mode-advanced', mode === 'advanced');
+  document.querySelectorAll('#mode-toggle button').forEach(b => {
+    b.classList.toggle('active', b.dataset.mode === mode);
+  });
+  localStorage.setItem(LS_MODE, mode);
+}
+document.getElementById('mode-toggle').addEventListener('click', (e) => {
+  const b = e.target.closest('button[data-mode]');
+  if (!b) return;
+  applyMode(b.dataset.mode);
+});
+applyMode(localStorage.getItem(LS_MODE) === 'advanced' ? 'advanced' : 'basic');
 
 render();
 registerSW();
