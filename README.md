@@ -83,6 +83,13 @@ A panel that streams every fetch the service worker saw: timestamp, method, path
 - **Pause** freezes the live feed without disabling persistence. **Clear** wipes memory and IDB.
 - A badge on the header icon shows how many entries arrived while the panel was closed.
 
+### Copy fetch (Advanced)
+
+Each endpoint card in Advanced mode has a **Copy fetch** button that puts a ready-to-paste `fetch()` snippet on your clipboard, tailored to the method:
+
+- `GET` / `DELETE` → a minimal call.
+- `POST` / `PUT` / `PATCH` → includes `Content-Type` header and a `JSON.stringify({ /* your payload */ })` body stub.
+
 ### Import / Export (Advanced)
 
 Two buttons in the Endpoints toolbar. **Export** downloads every endpoint (method, path, description, response, scenario, approval state) as `mockgen-YYYY-MM-DD.json`. **Import** reads a previously-exported file and merges by `method + path` — imports win on conflict, existing endpoints not in the file are preserved. Good for backups and sharing mock collections with teammates.
