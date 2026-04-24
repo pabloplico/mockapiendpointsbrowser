@@ -48,6 +48,36 @@
   .key-toggle.has-key .status-dot { display: block; }
 
   #key-section.collapsed { display: none; }
+
+  .log-toggle { position: relative; display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; background: transparent; border: 1px solid var(--border); border-radius: 6px; color: var(--muted); cursor: pointer; padding: 0; transition: color 0.15s, background 0.15s, border-color 0.15s; }
+  .log-toggle:hover { color: var(--text); background: var(--panel-2); border-color: #3a4150; }
+  .log-toggle.active { background: var(--panel-2); color: var(--text); border-color: var(--accent); }
+  .log-toggle svg { display: block; }
+  .log-toggle .count { position: absolute; top: -6px; right: -6px; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 8px; background: var(--accent-2); color: white; font-size: 10px; line-height: 16px; text-align: center; font-weight: 600; display: none; }
+  .log-toggle.has-count .count { display: inline-block; }
+
+  .log-panel { position: fixed; left: 0; right: 0; bottom: 0; height: 260px; background: var(--panel); border-top: 1px solid var(--border); box-shadow: 0 -4px 20px rgba(0,0,0,0.4); display: none; flex-direction: column; z-index: 100; }
+  .log-panel.open { display: flex; }
+  .log-panel header { display: flex; align-items: center; justify-content: space-between; padding: 8px 14px; border-bottom: 1px solid var(--border); margin: 0; gap: 10px; }
+  .log-panel header h3 { margin: 0; font-size: 13px; font-weight: 500; color: var(--muted); }
+  .log-panel header .actions { display: flex; align-items: center; gap: 8px; }
+  .log-panel header label { font-size: 12px; color: var(--muted); display: inline-flex; align-items: center; gap: 6px; cursor: pointer; user-select: none; }
+  .log-panel header input[type="checkbox"] { accent-color: var(--accent-2); }
+  .log-panel header button { font-size: 12px; padding: 4px 10px; }
+  .log-list { flex: 1; overflow-y: auto; font-family: var(--mono); font-size: 12px; padding: 4px 0; }
+  .log-row { display: grid; grid-template-columns: 80px 18px 56px 1fr 80px 60px; gap: 10px; padding: 4px 14px; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.02); }
+  .log-row:hover { background: var(--panel-2); }
+  .log-row .t { color: var(--muted); font-size: 11px; }
+  .log-row .dot { width: 8px; height: 8px; border-radius: 50%; background: #555; justify-self: center; }
+  .log-row.hit .dot { background: var(--green); }
+  .log-row.miss .dot { background: var(--muted); opacity: 0.5; }
+  .log-row .m { font-weight: 600; font-size: 11px; }
+  .log-row .m.GET { color: var(--accent); } .log-row .m.POST { color: var(--green); } .log-row .m.PUT, .log-row .m.PATCH { color: var(--amber); } .log-row .m.DELETE { color: var(--red); }
+  .log-row .p { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .log-row .s { color: var(--muted); font-size: 11px; }
+  .log-row .c { color: var(--muted); font-size: 11px; justify-self: end; }
+  .log-row .c.ok { color: var(--green); } .log-row .c.err { color: var(--red); }
+  .log-empty { color: var(--muted); text-align: center; padding: 40px; font-family: inherit; font-size: 13px; font-style: italic; }
   .sw-status { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
   .sw-status .dot { width: 8px; height: 8px; border-radius: 50%; background: #555; }
   .sw-status.active .dot { background: var(--green); box-shadow: 0 0 0 3px rgba(93, 211, 158, 0.15); }
@@ -170,6 +200,10 @@
       <button data-mode="basic" role="tab" title="Essential controls only">Basic</button>
       <button data-mode="advanced" role="tab" title="All features">Advanced</button>
     </div>
+    <button class="log-toggle adv-only" id="log-toggle" title="Request log" aria-label="Toggle request log">
+      <svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor" aria-hidden="true"><path d="M2 2h12v2H2V2zm0 4h12v2H2V6zm0 4h8v2H2v-2zm0 4h6v2H2v-2z"/></svg>
+      <span class="count" id="log-count">0</span>
+    </button>
     <button class="key-toggle" id="key-toggle" title="Gemini API key" aria-label="Toggle API key editor">
       <svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor" aria-hidden="true"><path d="M10.5 1a4.5 4.5 0 0 0-4.286 5.9L.146 12.96a.5.5 0 0 0-.146.354V15a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1v-1h1a1 1 0 0 0 1-1v-1h1a.5.5 0 0 0 .354-.146l.328-.329A4.5 4.5 0 1 0 10.5 1zm1.5 4a1 1 0 1 1 0-2 1 1 0 0 1 0 2z"/></svg>
       <span class="status-dot" aria-hidden="true"></span>
@@ -194,6 +228,8 @@
     <div>Statuses: <span class="badge draft status-ref">draft</span> no data yet · <span class="badge generated status-ref">generated</span> review it · <span class="badge approved status-ref">approved</span> live.</div>
     <div style="margin-top:10px">Editing method, path, or description un-approves the mock so you can't accidentally serve stale data.</div>
     <div class="adv-only" style="margin-top:10px"><strong>Scenarios:</strong> once a mock is approved, flip between <em>Normal</em>, <em>Empty</em>, <em>Error</em>, and <em>Loading</em> to preview each UI state without rewriting the JSON.</div>
+    <div class="adv-only" style="margin-top:6px"><strong>Request log:</strong> toggle the log icon in the header to see every fetch the service worker handled. Enable <em>Log while closed</em> to persist entries even when this tab is closed.</div>
+    <div class="adv-only" style="margin-top:6px"><strong>Import / Export:</strong> back up your mocks or share them with a teammate as a JSON file.</div>
   </div>
 </details>
 
@@ -209,7 +245,11 @@
 
 <div class="toolbar">
   <h2>Endpoints</h2>
-  <button class="primary" id="new-endpoint" title="Add a new mock endpoint">+ New endpoint</button>
+  <div class="row">
+    <button class="ghost adv-only" id="import-btn" title="Import endpoints from a MockGen JSON file. Merges by method+path; imports win on conflict.">Import</button>
+    <button class="ghost adv-only" id="export-btn" title="Download all endpoints as a JSON file">Export</button>
+    <button class="primary" id="new-endpoint" title="Add a new mock endpoint">+ New endpoint</button>
+  </div>
 </div>
 
 <div id="endpoints"></div>
@@ -224,6 +264,21 @@
 
 <div id="toast" class="toast"></div>
 
+<aside class="log-panel" id="log-panel" aria-label="Request log">
+  <header>
+    <h3>Request log <span id="log-meta" style="margin-left:6px"></span></h3>
+    <div class="actions">
+      <label title="When on, the service worker writes every fetch to IndexedDB even when this tab is closed. Entries persist across reloads (capped at 500).">
+        <input type="checkbox" id="persist-log"> Log while closed
+      </label>
+      <button class="ghost" id="pause-log" title="Pause/resume live feed (doesn't affect persistence)">Pause</button>
+      <button class="ghost" id="clear-log" title="Clear all logged entries (memory + persisted)">Clear</button>
+      <button class="ghost" id="close-log" title="Close panel">Close</button>
+    </div>
+  </header>
+  <div class="log-list" id="log-list"><div class="log-empty">No requests logged yet.</div></div>
+</aside>
+
 <script>
 const MODEL = 'gemini-2.5-flash';
 const LS_KEY = 'mockgen.apiKey';
@@ -231,8 +286,11 @@ const LS_ENDPOINTS = 'mockgen.endpoints';
 const LS_MODE = 'mockgen.mode';
 
 const DB_NAME = 'mockgen';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const STORE = 'mocks';
+const LOGS = 'logs';
+const SETTINGS = 'settings';
+const CHANNEL = 'mockgen-log';
 
 function openDB() {
   return new Promise((resolve, reject) => {
@@ -240,9 +298,54 @@ function openDB() {
     req.onupgradeneeded = () => {
       const db = req.result;
       if (!db.objectStoreNames.contains(STORE)) db.createObjectStore(STORE, { keyPath: 'key' });
+      if (!db.objectStoreNames.contains(LOGS)) db.createObjectStore(LOGS, { keyPath: 'id', autoIncrement: true });
+      if (!db.objectStoreNames.contains(SETTINGS)) db.createObjectStore(SETTINGS, { keyPath: 'key' });
     };
     req.onsuccess = () => resolve(req.result);
     req.onerror = () => reject(req.error);
+  });
+}
+
+async function readAllLogs() {
+  const db = await openDB();
+  return new Promise((resolve) => {
+    const tx = db.transaction(LOGS, 'readonly');
+    const req = tx.objectStore(LOGS).getAll();
+    req.onsuccess = () => resolve(req.result || []);
+    req.onerror = () => resolve([]);
+  });
+}
+
+async function clearLogs() {
+  const db = await openDB();
+  return new Promise((resolve) => {
+    const tx = db.transaction(LOGS, 'readwrite');
+    tx.objectStore(LOGS).clear();
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => resolve();
+  });
+}
+
+async function setPersistLog(on) {
+  const db = await openDB();
+  await new Promise((resolve) => {
+    const tx = db.transaction(SETTINGS, 'readwrite');
+    tx.objectStore(SETTINGS).put({ key: 'persist-log', value: !!on });
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => resolve();
+  });
+  if (navigator.serviceWorker.controller) {
+    navigator.serviceWorker.controller.postMessage({ type: 'SETTINGS_CHANGED' });
+  }
+}
+
+async function getPersistLog() {
+  const db = await openDB();
+  return new Promise((resolve) => {
+    const tx = db.transaction(SETTINGS, 'readonly');
+    const req = tx.objectStore(SETTINGS).get('persist-log');
+    req.onsuccess = () => resolve(!!(req.result && req.result.value));
+    req.onerror = () => resolve(false);
   });
 }
 
@@ -465,6 +568,85 @@ document.getElementById('endpoints').addEventListener('input', (e) => {
   saveEndpoints();
 });
 
+function exportEndpoints() {
+  const data = {
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    endpoints: state.endpoints.map(ep => ({
+      method: ep.method,
+      path: ep.path,
+      description: ep.description || '',
+      response: ep.response ?? null,
+      approved: !!ep.approved,
+      scenario: ep.scenario || 'normal',
+    })),
+  };
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `mockgen-${new Date().toISOString().slice(0, 10)}.json`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+  toast(`Exported ${data.endpoints.length} endpoint${data.endpoints.length === 1 ? '' : 's'}`, 'success');
+}
+
+function importEndpoints() {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = 'application/json,.json';
+  input.onchange = async () => {
+    const file = input.files && input.files[0];
+    if (!file) return;
+    try {
+      const text = await file.text();
+      const data = JSON.parse(text);
+      if (!data || !Array.isArray(data.endpoints)) throw new Error('Not a MockGen export file');
+      const byKey = new Map(state.endpoints.map(ep => [`${ep.method} ${ep.path}`, ep]));
+      let added = 0, updated = 0, skipped = 0;
+      for (const imp of data.endpoints) {
+        if (!imp.method || !imp.path) { skipped++; continue; }
+        const key = `${imp.method} ${imp.path}`;
+        const existing = byKey.get(key);
+        if (existing) {
+          existing.description = imp.description || '';
+          existing.response = imp.response ?? null;
+          existing.approved = !!imp.approved;
+          existing.scenario = imp.scenario || 'normal';
+          delete existing.error;
+          updated++;
+        } else {
+          state.endpoints.push({
+            id: uid(),
+            method: imp.method,
+            path: imp.path,
+            description: imp.description || '',
+            response: imp.response ?? null,
+            approved: !!imp.approved,
+            scenario: imp.scenario || 'normal',
+          });
+          added++;
+        }
+      }
+      saveEndpoints();
+      render();
+      const parts = [];
+      if (added) parts.push(`${added} added`);
+      if (updated) parts.push(`${updated} updated`);
+      if (skipped) parts.push(`${skipped} skipped`);
+      toast('Imported: ' + (parts.join(', ') || 'nothing'), added || updated ? 'success' : 'error');
+    } catch (err) {
+      toast('Import failed: ' + err.message, 'error');
+    }
+  };
+  input.click();
+}
+
+document.getElementById('export-btn').addEventListener('click', exportEndpoints);
+document.getElementById('import-btn').addEventListener('click', importEndpoints);
+
 document.getElementById('new-endpoint').addEventListener('click', () => {
   const ep = { id: uid(), method: 'GET', path: '', description: '', response: null, approved: false };
   state.endpoints.unshift(ep);
@@ -610,6 +792,121 @@ async function registerSW() {
     setStatus('error', 'failed to register: ' + err.message);
   }
 }
+
+const logState = {
+  open: false,
+  paused: false,
+  entries: [],
+  unread: 0,
+  cap: 500,
+};
+
+function fmtTime(t) {
+  const d = new Date(t);
+  return d.toLocaleTimeString([], { hour12: false }) + '.' + String(d.getMilliseconds()).padStart(3, '0');
+}
+
+function renderLog() {
+  const list = document.getElementById('log-list');
+  const meta = document.getElementById('log-meta');
+  if (!logState.entries.length) {
+    list.innerHTML = '<div class="log-empty">No requests logged yet.</div>';
+    meta.textContent = '';
+    return;
+  }
+  meta.textContent = `· ${logState.entries.length} entr${logState.entries.length === 1 ? 'y' : 'ies'}${logState.paused ? ' · paused' : ''}`;
+  const recent = logState.entries.slice(-logState.cap);
+  list.innerHTML = recent.map(e => {
+    const hitCls = e.hit ? 'hit' : 'miss';
+    const statusCls = e.status == null ? '' : (e.status >= 400 ? 'err' : 'ok');
+    const statusTxt = e.status == null ? '—' : e.status;
+    const scn = e.hit ? (e.scenario || 'normal') : 'miss';
+    return `<div class="log-row ${hitCls}">
+      <span class="t">${fmtTime(e.t)}</span>
+      <span class="dot"></span>
+      <span class="m ${e.method}">${e.method}</span>
+      <span class="p" title="${escapeHTML(e.path)}">${escapeHTML(e.path)}</span>
+      <span class="s">${scn}</span>
+      <span class="c ${statusCls}">${statusTxt}</span>
+    </div>`;
+  }).join('');
+  list.scrollTop = list.scrollHeight;
+}
+
+function updateLogBadge() {
+  const btn = document.getElementById('log-toggle');
+  const count = document.getElementById('log-count');
+  if (logState.unread > 0) {
+    btn.classList.add('has-count');
+    count.textContent = logState.unread > 99 ? '99+' : String(logState.unread);
+  } else {
+    btn.classList.remove('has-count');
+  }
+}
+
+function appendLogEntry(entry) {
+  if (logState.paused) return;
+  logState.entries.push(entry);
+  if (logState.entries.length > logState.cap) logState.entries.splice(0, logState.entries.length - logState.cap);
+  if (logState.open) {
+    renderLog();
+  } else {
+    logState.unread++;
+    updateLogBadge();
+  }
+}
+
+async function openLogPanel() {
+  logState.open = true;
+  logState.unread = 0;
+  updateLogBadge();
+  document.getElementById('log-panel').classList.add('open');
+  document.getElementById('log-toggle').classList.add('active');
+  const stored = await readAllLogs();
+  stored.sort((a, b) => a.t - b.t);
+  const seen = new Set(logState.entries.map(e => e.t));
+  for (const e of stored) if (!seen.has(e.t)) logState.entries.push(e);
+  logState.entries.sort((a, b) => a.t - b.t);
+  renderLog();
+}
+
+function closeLogPanel() {
+  logState.open = false;
+  document.getElementById('log-panel').classList.remove('open');
+  document.getElementById('log-toggle').classList.remove('active');
+}
+
+document.getElementById('log-toggle').addEventListener('click', () => {
+  if (logState.open) closeLogPanel();
+  else openLogPanel();
+});
+document.getElementById('close-log').addEventListener('click', closeLogPanel);
+document.getElementById('pause-log').addEventListener('click', (e) => {
+  logState.paused = !logState.paused;
+  e.target.textContent = logState.paused ? 'Resume' : 'Pause';
+  renderLog();
+});
+document.getElementById('clear-log').addEventListener('click', async () => {
+  logState.entries = [];
+  logState.unread = 0;
+  updateLogBadge();
+  await clearLogs();
+  renderLog();
+});
+
+const persistCheckbox = document.getElementById('persist-log');
+getPersistLog().then(on => { persistCheckbox.checked = on; });
+persistCheckbox.addEventListener('change', async (e) => {
+  await setPersistLog(e.target.checked);
+  toast(e.target.checked ? 'Logging while closed: on' : 'Logging while closed: off');
+});
+
+try {
+  const bc = new BroadcastChannel(CHANNEL);
+  bc.addEventListener('message', (e) => {
+    if (e.data && typeof e.data === 'object' && 'method' in e.data) appendLogEntry(e.data);
+  });
+} catch {}
 
 function applyMode(mode) {
   document.body.classList.toggle('mode-advanced', mode === 'advanced');

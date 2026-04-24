@@ -74,6 +74,19 @@ A toggle in the header switches between two tiers:
 - **Basic** — essential controls only: method, path, description, Generate, Approve.
 - **Advanced** — adds per-endpoint tooling. More will land here over time.
 
+### Request log (Advanced)
+
+A panel that streams every fetch the service worker saw: timestamp, method, path, whether it hit a mock or fell through to the network, which scenario was served, and the response status. Toggle it with the log icon in the header.
+
+- **Live feed** uses a `BroadcastChannel`, so the panel updates in real time while MockGen is open.
+- **Log while closed** — a checkbox inside the panel. When on, the service worker also persists every fetch to IndexedDB (capped at 500 entries, oldest-evicted). You'll see those entries when you reopen the panel, even if the MockGen tab was closed when the fetches happened. Off by default to keep storage lean.
+- **Pause** freezes the live feed without disabling persistence. **Clear** wipes memory and IDB.
+- A badge on the header icon shows how many entries arrived while the panel was closed.
+
+### Import / Export (Advanced)
+
+Two buttons in the Endpoints toolbar. **Export** downloads every endpoint (method, path, description, response, scenario, approval state) as `mockgen-YYYY-MM-DD.json`. **Import** reads a previously-exported file and merges by `method + path` — imports win on conflict, existing endpoints not in the file are preserved. Good for backups and sharing mock collections with teammates.
+
 ### Scenarios (Advanced)
 
 Once a mock is approved, a scenario row appears on the endpoint card with four options. Each is served with an `X-MockGen-Scenario` header so your app code can tell which variant came back if it cares.
