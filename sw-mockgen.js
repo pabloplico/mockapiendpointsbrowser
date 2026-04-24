@@ -32,14 +32,19 @@ async function findMock(method, pathname) {
 }
 
 let persistLog = false;
+let pauseAll = false;
 async function loadSettings() {
   try {
     const db = await openDB();
     await new Promise((resolve) => {
       const tx = db.transaction(SETTINGS, 'readonly');
-      const req = tx.objectStore(SETTINGS).get('persist-log');
-      req.onsuccess = () => { persistLog = !!(req.result && req.result.value); resolve(); };
-      req.onerror = () => resolve();
+      const store = tx.objectStore(SETTINGS);
+      const r1 = store.get('persist-log');
+      const r2 = store.get('pause-all');
+      r1.onsuccess = () => { persistLog = !!(r1.result && r1.result.value); };
+      r2.onsuccess = () => { pauseAll = !!(r2.result && r2.result.value); };
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => resolve();
     });
   } catch {}
 }
@@ -140,7 +145,7 @@ self.addEventListener('fetch', (event) => {
     let entry = { t: Date.now(), method: req.method, path: url.pathname, hit: false, scenario: null, status: null };
     try {
       const mock = await findMock(req.method, url.pathname);
-      if (mock && mock.approved && mock.response !== undefined) {
+      if (mock && mock.approved && mock.enabled !== false && !pauseAll && mock.response !== undefined) {
         const scenario = mock.scenario || 'normal';
         if (scenario === 'loading') {
           await new Promise(r => setTimeout(r, 5 * 60 * 1000));

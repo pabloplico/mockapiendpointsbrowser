@@ -162,6 +162,25 @@
   .data-table td.nested { color: var(--amber); }
   .table-empty { color: var(--muted); font-style: italic; text-align: center; padding: 20px; font-size: 13px; }
 
+  .switch { display: inline-block; background: transparent; border: none; padding: 0; cursor: pointer; position: relative; width: 30px; height: 16px; flex-shrink: 0; }
+  .switch .track { position: absolute; inset: 0; background: var(--border); border-radius: 8px; transition: background 0.15s; }
+  .switch .track::before { content: ""; position: absolute; left: 2px; top: 2px; width: 12px; height: 12px; background: var(--muted); border-radius: 50%; transition: transform 0.15s, background 0.15s; }
+  .switch.on .track { background: rgba(93, 211, 158, 0.35); }
+  .switch.on .track::before { transform: translateX(14px); background: var(--green); }
+  .switch:hover:not(.on) .track { background: #333a47; }
+  .endpoint.disabled { opacity: 0.55; }
+  .endpoint.disabled .method, .endpoint.disabled .path, .endpoint.disabled .badge { filter: saturate(0.4); }
+
+  .pause-toggle { position: relative; display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; background: transparent; border: 1px solid var(--border); border-radius: 6px; color: var(--muted); cursor: pointer; padding: 0; transition: color 0.15s, background 0.15s, border-color 0.15s; }
+  .pause-toggle:hover { color: var(--text); background: var(--panel-2); border-color: #3a4150; }
+  .pause-toggle.active { background: rgba(245, 193, 108, 0.1); color: var(--amber); border-color: rgba(245, 193, 108, 0.4); }
+  .pause-toggle svg { display: block; }
+
+  .pause-banner { background: rgba(245, 193, 108, 0.08); border: 1px solid rgba(245, 193, 108, 0.3); color: var(--amber); padding: 10px 14px; border-radius: 6px; margin-bottom: 16px; font-size: 13px; display: none; align-items: center; justify-content: space-between; gap: 12px; }
+  .pause-banner.visible { display: flex; }
+  .pause-banner button { background: transparent; border: 1px solid var(--amber); color: var(--amber); font-size: 12px; padding: 4px 10px; border-radius: 4px; cursor: pointer; font-family: inherit; }
+  .pause-banner button:hover { background: rgba(245, 193, 108, 0.1); }
+
   .empty-state { text-align: center; padding: 60px 20px; color: var(--muted); }
   .empty-state h3 { color: var(--text); margin: 0 0 8px; font-size: 16px; }
 
@@ -218,6 +237,9 @@
       <button data-mode="basic" role="tab" title="Essential controls only">Basic</button>
       <button data-mode="advanced" role="tab" title="All features">Advanced</button>
     </div>
+    <button class="pause-toggle" id="pause-toggle" title="Pause all mocks — all fetches pass through to the network" aria-label="Pause all mocks">
+      <svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor" aria-hidden="true"><path d="M5 3h2v10H5V3zm4 0h2v10H9V3z"/></svg>
+    </button>
     <button class="log-toggle adv-only" id="log-toggle" title="Request log" aria-label="Toggle request log">
       <svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor" aria-hidden="true"><path d="M2 2h12v2H2V2zm0 4h12v2H2V6zm0 4h8v2H2v-2zm0 4h6v2H2v-2z"/></svg>
       <span class="count" id="log-count">0</span>
@@ -260,6 +282,11 @@
   </div>
   <div class="key-hint">Stored in localStorage, never leaves the browser. Get one at <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a>.</div>
 </section>
+
+<div class="pause-banner" id="pause-banner" role="status">
+  <span><strong>All mocks paused.</strong> Fetches are passing through to the network as if MockGen weren't installed.</span>
+  <button id="banner-resume">Resume</button>
+</div>
 
 <div class="toolbar">
   <h2>Endpoints</h2>
@@ -395,11 +422,34 @@ async function syncAllToDB(endpoints) {
     store.clear();
     for (const ep of endpoints) {
       if (ep.method && ep.path) {
-        store.put({ key: `${ep.method} ${ep.path}`, method: ep.method, path: ep.path, response: ep.response, approved: !!ep.approved, scenario: ep.scenario || 'normal' });
+        store.put({ key: `${ep.method} ${ep.path}`, method: ep.method, path: ep.path, response: ep.response, approved: !!ep.approved, scenario: ep.scenario || 'normal', enabled: ep.enabled !== false });
       }
     }
     tx.oncomplete = () => resolve();
     tx.onerror = () => reject(tx.error);
+  });
+}
+
+async function setPauseAll(on) {
+  const db = await openDB();
+  await new Promise((resolve) => {
+    const tx = db.transaction(SETTINGS, 'readwrite');
+    tx.objectStore(SETTINGS).put({ key: 'pause-all', value: !!on });
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => resolve();
+  });
+  if (navigator.serviceWorker.controller) {
+    navigator.serviceWorker.controller.postMessage({ type: 'SETTINGS_CHANGED' });
+  }
+}
+
+async function getPauseAll() {
+  const db = await openDB();
+  return new Promise((resolve) => {
+    const tx = db.transaction(SETTINGS, 'readonly');
+    const req = tx.objectStore(SETTINGS).get('pause-all');
+    req.onsuccess = () => resolve(!!(req.result && req.result.value));
+    req.onerror = () => resolve(false);
   });
 }
 
@@ -539,12 +589,17 @@ function render() {
             </div>
             <span class="scenario-note">${scenarioNotes[scenario]}</span>
           </div>` : '';
+    const enabled = ep.enabled !== false;
+    const switchTitle = enabled
+      ? 'On — mock is intercepting matching fetches. Click to disable (fall through to network).'
+      : 'Off — fetches pass through to the network. Click to enable.';
     return `
-      <div class="endpoint ${open}" data-id="${ep.id}">
+      <div class="endpoint ${open} ${enabled ? '' : 'disabled'}" data-id="${ep.id}">
         <div class="ep-head" data-action="toggle" title="Click to ${state.openId === ep.id ? 'collapse' : 'expand'}">
           <span class="method ${ep.method}" title="HTTP method">${ep.method}</span>
           <span class="path" title="Request path">${escapeHTML(ep.path || '(no path)')}</span>
           <span class="ep-desc" title="${escapeHTML(ep.description || '')}">${escapeHTML(ep.description || '')}</span>
+          <button class="switch ${enabled ? 'on' : ''}" data-action="toggle-enabled" title="${switchTitle}" aria-label="Enable/disable endpoint"><span class="track"></span></button>
           <span class="badge ${status}" title="${badgeTitle}">${status}</span>
         </div>
         <div class="ep-body">
@@ -611,6 +666,13 @@ document.getElementById('endpoints').addEventListener('click', async (e) => {
     saveEndpoints();
     render();
     toast('Approved — mock is live', 'success');
+    return;
+  }
+  if (action === 'toggle-enabled') {
+    ep.enabled = ep.enabled === false ? true : false;
+    saveEndpoints();
+    render();
+    toast(ep.enabled ? 'Endpoint enabled' : 'Endpoint disabled — passes through');
     return;
   }
   if (action === 'view-mode') {
@@ -1022,6 +1084,26 @@ try {
     if (e.data && typeof e.data === 'object' && 'method' in e.data) appendLogEntry(e.data);
   });
 } catch {}
+
+function applyPauseUI(paused) {
+  const btn = document.getElementById('pause-toggle');
+  const banner = document.getElementById('pause-banner');
+  btn.classList.toggle('active', paused);
+  btn.title = paused
+    ? 'Mocks paused — click to resume. All fetches are passing through.'
+    : 'Pause all mocks — all fetches pass through to the network';
+  banner.classList.toggle('visible', paused);
+}
+async function togglePauseAll() {
+  const current = await getPauseAll();
+  const next = !current;
+  applyPauseUI(next);
+  await setPauseAll(next);
+  toast(next ? 'All mocks paused' : 'Mocks resumed');
+}
+document.getElementById('pause-toggle').addEventListener('click', togglePauseAll);
+document.getElementById('banner-resume').addEventListener('click', togglePauseAll);
+getPauseAll().then(applyPauseUI);
 
 function applyMode(mode) {
   document.body.classList.toggle('mode-advanced', mode === 'advanced');

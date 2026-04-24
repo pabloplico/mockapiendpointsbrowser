@@ -78,6 +78,15 @@ Every endpoint card has a `Raw | Table` toggle above the response preview. Table
 
 Nested values are collapsed (`{…}` / `[n items]`) with the full JSON available on hover. The setting persists across reloads and is global across endpoints.
 
+## Enable / disable
+
+Every endpoint card has a small on/off switch in its header.
+
+- **On** (default, green) — the mock intercepts matching fetches.
+- **Off** (grey) — the card is dimmed and fetches pass through to the network, same as if the endpoint didn't exist. The definition is preserved so you can flip it back anytime.
+
+A **pause icon in the header** is a master switch. When active, every mock is bypassed and a banner at the top of the page reminds you. Approval, scenarios, and per-endpoint toggles are preserved; they resume instantly when you click **Resume**.
+
 ## Basic vs Advanced mode
 
 A toggle in the header switches between two tiers:
