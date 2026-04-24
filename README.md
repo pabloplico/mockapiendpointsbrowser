@@ -39,6 +39,26 @@ The demo `index.html` is just for testing. To point MockGen at your real app:
 - Open `/mockgen.html` to manage mocks. Open `/` (or whatever path your app lives at) to use your app.
 - When using a framework dev server (Vite, Next, etc.), copy the two files into the static folder — `public/` for Vite/Next, `static/` for SvelteKit/Astro.
 
+## Using it with a Replit app
+
+Drop `mockgen.html` and `sw-mockgen.js` into your Replit's static file folder so they're served from the same origin as your app (`https://yourapp.username.repl.co`).
+
+**Where that folder lives depends on your Replit template:**
+
+- **Static HTML/JS Repl** — drop them next to `index.html` at the project root.
+- **Vite / React / Svelte / Next.js** — `public/` (or `static/` for SvelteKit/Astro).
+- **Express / Node** — put them in whatever folder is served by `express.static()`, usually `public/`. If you're not serving statics yet, add `app.use(express.static('public'))`.
+- **Flask / Django** — serve from the framework's static folder. You may need a root-level route so the SW registers at scope `/` rather than `/static/`.
+
+Then open `https://yourapp.username.repl.co/mockgen.html` to manage mocks, and use your app as normal — fetches will be intercepted.
+
+**Notes:**
+
+- Replit serves over HTTPS, which service workers require. No extra setup.
+- The API key lives in your browser's localStorage, not in the Replit — it won't be committed or visible to collaborators.
+- Put the SW file at the project root (`/sw-mockgen.js`) so its scope covers the whole app. If it's served from a subpath, its scope is limited to that subpath.
+- Cross-origin setups won't work: if your frontend is on a different Replit (or on Netlify/Vercel) from your backend, MockGen can only intercept calls within its own origin.
+
 ## Workflow
 
 - **Draft** — you've added the endpoint but haven't generated yet.
