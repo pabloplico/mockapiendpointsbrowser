@@ -81,6 +81,7 @@
   .sw-status { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
   .sw-status .dot { width: 8px; height: 8px; border-radius: 50%; background: #555; }
   .sw-status.active .dot { background: var(--green); box-shadow: 0 0 0 3px rgba(93, 211, 158, 0.15); }
+  .sw-status.paused .dot { background: var(--amber); box-shadow: 0 0 0 3px rgba(245, 193, 108, 0.15); }
   .sw-status.error .dot { background: var(--red); }
 
   .row { display: flex; gap: 12px; align-items: center; }
@@ -145,7 +146,15 @@
   .preview.empty { color: var(--muted); font-style: italic; white-space: normal; font-family: inherit; text-align: center; padding: 24px; margin-top: 10px; }
 
   .preview-wrap { margin-top: 10px; }
-  .preview-tabs { display: inline-flex; background: var(--panel); border: 1px solid var(--border); border-radius: 6px; padding: 2px; margin-bottom: 8px; }
+  .preview-toolbar { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 8px; flex-wrap: wrap; }
+  .preview-actions { display: flex; gap: 8px; }
+  .preview-actions button { padding: 4px 12px; font-size: 12px; }
+  .edit-textarea { width: 100%; min-height: 240px; background: var(--bg); border: 1px solid var(--border); color: var(--text); padding: 12px; border-radius: 6px; font-family: var(--mono); font-size: 12px; line-height: 1.5; resize: vertical; outline: none; transition: border-color 0.15s; }
+  .edit-textarea:focus { border-color: var(--accent); }
+  .refine-field { margin-top: 14px; }
+  .refine-field .field-row { gap: 8px; }
+  .refine-field input[type="text"] { flex: 1; font-family: inherit; }
+  .preview-tabs { display: inline-flex; background: var(--panel); border: 1px solid var(--border); border-radius: 6px; padding: 2px; }
   .preview-tabs button { background: transparent; border: none; padding: 3px 12px; font-size: 12px; color: var(--muted); border-radius: 4px; cursor: pointer; font-family: inherit; transition: color 0.15s, background 0.15s; }
   .preview-tabs button:hover:not(.active) { color: var(--text); }
   .preview-tabs button.active { background: var(--panel-2); color: var(--text); }
@@ -284,7 +293,7 @@
 </section>
 
 <div class="pause-banner" id="pause-banner" role="status">
-  <span><strong>All mocks paused.</strong> Fetches are passing through to the network as if MockGen weren't installed.</span>
+  <span><strong>All mocks paused.</strong> Fetches are passing through to the network as if MockGen weren't running.</span>
   <button id="banner-resume">Resume</button>
 </div>
 
@@ -459,6 +468,9 @@ const state = {
   endpoints: loadEndpoints(),
   openId: null,
   viewMode: localStorage.getItem(LS_VIEW_MODE) === 'table' ? 'table' : 'raw',
+  editingId: null,
+  editDraft: '',
+  editError: '',
 };
 
 function toTableView(data) {
@@ -560,15 +572,40 @@ function render() {
     const status = statusOf(ep);
     const open = state.openId === ep.id ? 'open' : '';
     const hasResp = ep.response !== undefined && ep.response !== null;
+    const editing = state.editingId === ep.id;
+    let previewBody;
+    if (editing) {
+      previewBody = `<textarea class="edit-textarea" data-field="edit-draft" spellcheck="false">${escapeHTML(state.editDraft)}</textarea>${state.editError ? `<div class="err-msg">${escapeHTML(state.editError)}</div>` : ''}`;
+    } else if (state.viewMode === 'table') {
+      previewBody = renderTableView(ep.response);
+    } else {
+      previewBody = `<div class="preview">${escapeHTML(JSON.stringify(ep.response, null, 2))}</div>`;
+    }
     const preview = hasResp
       ? `<div class="preview-wrap">
-           <div class="preview-tabs" title="Switch between raw JSON and a table view">
-             <button data-action="view-mode" data-view="raw" class="${state.viewMode === 'raw' ? 'active' : ''}">Raw</button>
-             <button data-action="view-mode" data-view="table" class="${state.viewMode === 'table' ? 'active' : ''}">Table</button>
+           <div class="preview-toolbar">
+             <div class="preview-tabs" title="Switch between raw JSON and a table view">
+               <button data-action="view-mode" data-view="raw" class="${state.viewMode === 'raw' ? 'active' : ''}" ${editing ? 'disabled' : ''}>Raw</button>
+               <button data-action="view-mode" data-view="table" class="${state.viewMode === 'table' ? 'active' : ''}" ${editing ? 'disabled' : ''}>Table</button>
+             </div>
+             <div class="preview-actions">
+               ${editing
+                 ? `<button class="success" data-action="save-edit" title="Parse and save the JSON">Save</button>
+                    <button class="ghost" data-action="cancel-edit" title="Discard edits">Cancel</button>`
+                 : (state.viewMode === 'raw' ? `<button class="ghost" data-action="edit" title="Edit the JSON directly — useful for small tweaks without calling Gemini">Edit</button>` : '')}
+             </div>
            </div>
-           ${state.viewMode === 'table' ? renderTableView(ep.response) : `<div class="preview">${escapeHTML(JSON.stringify(ep.response, null, 2))}</div>`}
+           ${previewBody}
          </div>`
       : `<div class="preview empty">No response yet. Describe the data below and click Generate.</div>`;
+    const refineField = hasResp && !editing ? `
+          <div class="field refine-field">
+            <label>Refine <span class="hint" style="display:inline;margin-left:6px">— ask Gemini to tweak the response without regenerating from scratch</span></label>
+            <div class="field-row">
+              <input type="text" class="path-input" data-field="refineInput" value="${escapeHTML(ep.refineInput || '')}" placeholder="e.g. use British names, add an avatar_url field, make dates this year" title="Describe what to change about the current response">
+              <button class="primary" data-action="refine" title="Regenerate with these changes applied to the current JSON">Refine</button>
+            </div>
+          </div>` : '';
     const badgeTitle = status === 'approved'
       ? 'Live — this mock is being served to your app'
       : status === 'generated'
@@ -624,6 +661,7 @@ function render() {
             <button class="danger" data-action="delete" title="Remove this endpoint">Delete</button>
           </div>
           ${preview}
+          ${refineField}
           ${scenarioPicker}
           ${ep.error ? `<div class="err-msg">${escapeHTML(ep.error)}</div>` : ''}
         </div>
@@ -657,6 +695,38 @@ document.getElementById('endpoints').addEventListener('click', async (e) => {
   }
   if (action === 'generate') {
     await generate(ep, card);
+    return;
+  }
+  if (action === 'refine') {
+    await refine(ep, card);
+    return;
+  }
+  if (action === 'edit') {
+    state.editingId = ep.id;
+    state.editDraft = JSON.stringify(ep.response, null, 2);
+    state.editError = '';
+    render();
+    return;
+  }
+  if (action === 'save-edit') {
+    try {
+      const parsed = JSON.parse(state.editDraft);
+      ep.response = parsed;
+      state.editingId = null;
+      state.editError = '';
+      saveEndpoints();
+      render();
+      toast('Saved', 'success');
+    } catch (err) {
+      state.editError = err.message;
+      render();
+    }
+    return;
+  }
+  if (action === 'cancel-edit') {
+    state.editingId = null;
+    state.editError = '';
+    render();
     return;
   }
   if (action === 'approve') {
@@ -712,6 +782,20 @@ document.getElementById('endpoints').addEventListener('input', (e) => {
   if (!ep) return;
   const field = e.target.dataset.field;
   if (!field) return;
+  if (field === 'edit-draft') {
+    state.editDraft = e.target.value;
+    if (state.editError) {
+      state.editError = '';
+      const errEl = card.querySelector('.err-msg');
+      if (errEl) errEl.remove();
+    }
+    return;
+  }
+  if (field === 'refineInput') {
+    ep.refineInput = e.target.value;
+    saveEndpoints();
+    return;
+  }
   const oldKey = `${ep.method} ${ep.path}`;
   ep[field] = e.target.value;
   const newKey = `${ep.method} ${ep.path}`;
@@ -832,18 +916,56 @@ document.getElementById('new-endpoint').addEventListener('click', () => {
   render();
 });
 
-async function generate(ep, card) {
+async function callGeminiJSON(prompt) {
   const apiKey = localStorage.getItem(LS_KEY);
-  if (!apiKey) { toast('Enter your Gemini API key first', 'error'); return; }
+  if (!apiKey) throw new Error('Enter your Gemini API key first');
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${encodeURIComponent(apiKey)}`;
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      contents: [{ parts: [{ text: prompt }] }],
+      generationConfig: { responseMimeType: 'application/json', temperature: 0.7 },
+    }),
+  });
+  if (!res.ok) {
+    const txt = await res.text();
+    let msg = `Gemini error ${res.status}`;
+    try { const j = JSON.parse(txt); msg = j.error?.message || msg; } catch {}
+    throw new Error(msg);
+  }
+  const data = await res.json();
+  const parts = data.candidates?.[0]?.content?.parts || [];
+  const text = parts.map(p => p.text || '').join('').trim();
+  if (!text) {
+    const finish = data.candidates?.[0]?.finishReason;
+    const block = data.promptFeedback?.blockReason;
+    throw new Error('Empty response from Gemini' + (finish ? ` (finishReason: ${finish})` : '') + (block ? ` (blocked: ${block})` : ''));
+  }
+  let cleaned = text;
+  if (cleaned.startsWith('```')) cleaned = cleaned.replace(/^```(?:json|JSON)?\s*\n?/, '').replace(/\n?```\s*$/, '').trim();
+  const firstBrace = cleaned.search(/[\[{]/);
+  if (firstBrace > 0) cleaned = cleaned.slice(firstBrace);
+  try { return JSON.parse(cleaned); }
+  catch (e) {
+    const snippet = text.length > 300 ? text.slice(0, 300) + '…' : text;
+    throw new Error('Gemini returned invalid JSON: ' + e.message + ' — got: ' + snippet);
+  }
+}
+
+async function runWithButton(btn, loadingText, fn) {
+  const original = btn.textContent;
+  btn.disabled = true;
+  btn.innerHTML = `<span class="spinner"></span>${loadingText}`;
+  try { return await fn(); }
+  finally { btn.disabled = false; btn.textContent = original; }
+}
+
+async function generate(ep, card) {
   if (!ep.path || !ep.path.startsWith('/')) { toast('Path must start with /', 'error'); return; }
   if (!ep.description.trim()) { toast('Add a description of the data', 'error'); return; }
-
   const btn = card.querySelector('[data-action="generate"]');
-  const originalText = btn.textContent;
-  btn.disabled = true;
-  btn.innerHTML = '<span class="spinner"></span>Generating…';
   delete ep.error;
-
   const prompt = `You are generating mock JSON data for an HTTP API endpoint used in development/testing.
 
 Endpoint: ${ep.method} ${ep.path}
@@ -857,43 +979,8 @@ Requirements:
 - Use realistic-looking sample values (real-seeming names, emails, dates, IDs).
 - If the user asks for a list, return an array (or an object wrapping an array if conventional).
 - Keep the response reasonably sized unless a specific count is given.`;
-
   try {
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${encodeURIComponent(apiKey)}`;
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: { responseMimeType: 'application/json', temperature: 0.7 },
-      }),
-    });
-    if (!res.ok) {
-      const text = await res.text();
-      let msg = `Gemini error ${res.status}`;
-      try { const j = JSON.parse(text); msg = j.error?.message || msg; } catch {}
-      throw new Error(msg);
-    }
-    const data = await res.json();
-    const parts = data.candidates?.[0]?.content?.parts || [];
-    const text = parts.map(p => p.text || '').join('').trim();
-    if (!text) {
-      const finish = data.candidates?.[0]?.finishReason;
-      const block = data.promptFeedback?.blockReason;
-      throw new Error('Empty response from Gemini' + (finish ? ` (finishReason: ${finish})` : '') + (block ? ` (blocked: ${block})` : ''));
-    }
-    let cleaned = text;
-    if (cleaned.startsWith('```')) {
-      cleaned = cleaned.replace(/^```(?:json|JSON)?\s*\n?/, '').replace(/\n?```\s*$/, '').trim();
-    }
-    const firstBrace = cleaned.search(/[\[{]/);
-    if (firstBrace > 0) cleaned = cleaned.slice(firstBrace);
-    let parsed;
-    try { parsed = JSON.parse(cleaned); }
-    catch (e) {
-      const snippet = text.length > 300 ? text.slice(0, 300) + '…' : text;
-      throw new Error('Gemini returned invalid JSON: ' + e.message + ' — got: ' + snippet);
-    }
+    const parsed = await runWithButton(btn, 'Generating…', () => callGeminiJSON(prompt));
     ep.response = parsed;
     ep.approved = false;
     saveEndpoints();
@@ -903,9 +990,42 @@ Requirements:
     ep.error = err.message;
     render();
     toast(err.message, 'error');
-  } finally {
-    btn.disabled = false;
-    btn.textContent = originalText;
+  }
+}
+
+async function refine(ep, card) {
+  if (!ep.refineInput || !ep.refineInput.trim()) { toast('Describe what to change', 'error'); return; }
+  if (ep.response === undefined || ep.response === null) { toast('Nothing to refine yet — generate first', 'error'); return; }
+  const btn = card.querySelector('[data-action="refine"]');
+  delete ep.error;
+  const prompt = `You are refining mock JSON for an HTTP API endpoint used in development/testing.
+
+Endpoint: ${ep.method} ${ep.path}
+Original description: ${ep.description || '(none)'}
+
+Current JSON:
+${JSON.stringify(ep.response, null, 2)}
+
+Requested changes:
+${ep.refineInput}
+
+Requirements:
+- Return ONLY valid JSON — no prose, no markdown fences, no commentary.
+- Preserve the overall shape/structure unless the requested changes require otherwise.
+- Apply the requested changes faithfully; keep unrelated fields unchanged where possible.
+- Keep realistic-looking values.`;
+  try {
+    const parsed = await runWithButton(btn, 'Refining…', () => callGeminiJSON(prompt));
+    ep.response = parsed;
+    ep.approved = false;
+    ep.refineInput = '';
+    saveEndpoints();
+    render();
+    toast('Refined — review and approve to go live', 'success');
+  } catch (err) {
+    ep.error = err.message;
+    render();
+    toast(err.message, 'error');
   }
 }
 
@@ -948,6 +1068,21 @@ document.getElementById('clear-key').addEventListener('click', () => {
   apiKeyInput.focus();
 });
 
+let swReady = false;
+let allPaused = false;
+function renderSwBadge() {
+  const status = document.getElementById('sw-status');
+  if (!status) return;
+  const label = status.querySelector('.label');
+  if (!swReady) return;
+  if (allPaused) {
+    status.className = 'sw-status paused';
+    label.textContent = 'paused — passing through';
+  } else {
+    status.className = 'sw-status active';
+    label.textContent = 'active — intercepting fetch';
+  }
+}
 async function registerSW() {
   const status = document.getElementById('sw-status');
   const setStatus = (cls, label) => {
@@ -962,7 +1097,8 @@ async function registerSW() {
     const swPath = new URL('sw-mockgen.js', location.href).pathname;
     const reg = await navigator.serviceWorker.register(swPath, { scope: './' });
     await navigator.serviceWorker.ready;
-    setStatus('active', 'active — intercepting fetch');
+    swReady = true;
+    renderSwBadge();
     await syncAllToDB(state.endpoints);
   } catch (err) {
     console.error(err);
@@ -1093,6 +1229,8 @@ function applyPauseUI(paused) {
     ? 'Mocks paused — click to resume. All fetches are passing through.'
     : 'Pause all mocks — all fetches pass through to the network';
   banner.classList.toggle('visible', paused);
+  allPaused = paused;
+  renderSwBadge();
 }
 async function togglePauseAll() {
   const current = await getPauseAll();
