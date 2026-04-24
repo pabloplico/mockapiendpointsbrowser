@@ -67,6 +67,17 @@ Then open `https://yourapp.username.repl.co/mockgen.html` to manage mocks, and u
 
 Changing method, path, or description un-approves the mock automatically, so you never accidentally serve stale data.
 
+## Raw vs Table preview
+
+Every endpoint card has a `Raw | Table` toggle above the response preview. Table mode auto-detects the shape:
+
+- **Array of objects** → one row per object, columns = union of keys.
+- **Object wrapping an array** (`{data: [...]}`, `{users: [...]}`) → table of the inner array.
+- **Plain object** → two-column key/value table.
+- **Primitive / unsupported shape** → falls back to a note; use Raw instead.
+
+Nested values are collapsed (`{…}` / `[n items]`) with the full JSON available on hover. The setting persists across reloads and is global across endpoints.
+
 ## Basic vs Advanced mode
 
 A toggle in the header switches between two tiers:

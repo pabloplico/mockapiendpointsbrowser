@@ -141,8 +141,26 @@
   .actions { display: flex; gap: 8px; flex-wrap: wrap; }
   .actions .spacer { flex: 1; }
 
-  .preview { background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 12px; max-height: 380px; overflow: auto; font-family: var(--mono); font-size: 12px; white-space: pre; margin-top: 10px; }
-  .preview.empty { color: var(--muted); font-style: italic; white-space: normal; font-family: inherit; text-align: center; padding: 24px; }
+  .preview { background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 12px; max-height: 380px; overflow: auto; font-family: var(--mono); font-size: 12px; white-space: pre; margin-top: 0; }
+  .preview.empty { color: var(--muted); font-style: italic; white-space: normal; font-family: inherit; text-align: center; padding: 24px; margin-top: 10px; }
+
+  .preview-wrap { margin-top: 10px; }
+  .preview-tabs { display: inline-flex; background: var(--panel); border: 1px solid var(--border); border-radius: 6px; padding: 2px; margin-bottom: 8px; }
+  .preview-tabs button { background: transparent; border: none; padding: 3px 12px; font-size: 12px; color: var(--muted); border-radius: 4px; cursor: pointer; font-family: inherit; transition: color 0.15s, background 0.15s; }
+  .preview-tabs button:hover:not(.active) { color: var(--text); }
+  .preview-tabs button.active { background: var(--panel-2); color: var(--text); }
+
+  .table-hint { color: var(--muted); font-size: 11px; margin-bottom: 6px; }
+  .table-hint code { background: var(--panel-2); padding: 1px 5px; border-radius: 3px; font-family: var(--mono); font-size: 11px; color: var(--text); }
+  .table-scroll { overflow: auto; max-height: 380px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); }
+  .data-table { border-collapse: collapse; width: 100%; font-family: var(--mono); font-size: 12px; }
+  .data-table th { position: sticky; top: 0; background: var(--panel-2); color: var(--muted); text-align: left; padding: 6px 10px; font-weight: 500; border-bottom: 1px solid var(--border); white-space: nowrap; }
+  .data-table td { padding: 5px 10px; border-bottom: 1px solid rgba(255,255,255,0.03); vertical-align: top; white-space: nowrap; max-width: 320px; overflow: hidden; text-overflow: ellipsis; }
+  .data-table tr:hover td { background: var(--panel-2); }
+  .data-table td.key { color: var(--accent); font-weight: 500; white-space: nowrap; }
+  .data-table td.nullish { color: var(--muted); font-style: italic; }
+  .data-table td.nested { color: var(--amber); }
+  .table-empty { color: var(--muted); font-style: italic; text-align: center; padding: 20px; font-size: 13px; }
 
   .empty-state { text-align: center; padding: 60px 20px; color: var(--muted); }
   .empty-state h3 { color: var(--text); margin: 0 0 8px; font-size: 16px; }
@@ -385,10 +403,69 @@ async function syncAllToDB(endpoints) {
   });
 }
 
+const LS_VIEW_MODE = 'mockgen.viewMode';
+
 const state = {
   endpoints: loadEndpoints(),
   openId: null,
+  viewMode: localStorage.getItem(LS_VIEW_MODE) === 'table' ? 'table' : 'raw',
 };
+
+function toTableView(data) {
+  if (Array.isArray(data) && data.length && data.every(x => x && typeof x === 'object' && !Array.isArray(x))) {
+    return { type: 'records', rows: data };
+  }
+  if (data && typeof data === 'object' && !Array.isArray(data)) {
+    for (const k of ['data', 'items', 'results', 'records', 'list']) {
+      const v = data[k];
+      if (Array.isArray(v) && v.length && v.every(x => x && typeof x === 'object' && !Array.isArray(x))) {
+        return { type: 'records', rows: v, wrapKey: k };
+      }
+    }
+    const arrayKeys = Object.keys(data).filter(k => Array.isArray(data[k]) && data[k].length && data[k].every(x => x && typeof x === 'object' && !Array.isArray(x)));
+    if (arrayKeys.length === 1) return { type: 'records', rows: data[arrayKeys[0]], wrapKey: arrayKeys[0] };
+    if (Object.keys(data).length) return { type: 'properties', entries: Object.entries(data) };
+  }
+  return null;
+}
+
+function formatCellShort(v) {
+  if (v === null) return { text: 'null', cls: 'nullish' };
+  if (v === undefined) return { text: '', cls: 'nullish' };
+  if (typeof v === 'string') return { text: v, cls: '' };
+  if (typeof v === 'number' || typeof v === 'boolean') return { text: String(v), cls: '' };
+  if (Array.isArray(v)) return { text: `[${v.length} item${v.length === 1 ? '' : 's'}]`, cls: 'nested' };
+  if (typeof v === 'object') return { text: '{…}', cls: 'nested' };
+  return { text: String(v), cls: '' };
+}
+
+function formatCellFull(v) {
+  if (v === null || v === undefined) return '';
+  if (typeof v === 'object') return JSON.stringify(v, null, 2);
+  return String(v);
+}
+
+function renderTableView(data) {
+  const v = toTableView(data);
+  if (!v) return '<div class="table-empty">Table view not available for this response shape. Switch to Raw.</div>';
+  if (v.type === 'records') {
+    const cols = [...new Set(v.rows.flatMap(r => Object.keys(r)))];
+    const head = '<tr>' + cols.map(c => `<th>${escapeHTML(c)}</th>`).join('') + '</tr>';
+    const body = v.rows.map(r => '<tr>' + cols.map(c => {
+      const f = formatCellShort(r[c]);
+      return `<td class="${f.cls}" title="${escapeHTML(formatCellFull(r[c]))}">${escapeHTML(f.text)}</td>`;
+    }).join('') + '</tr>').join('');
+    const hint = v.wrapKey
+      ? `<div class="table-hint">Showing <code>${escapeHTML(v.wrapKey)}</code> array · ${v.rows.length} row${v.rows.length === 1 ? '' : 's'} · ${cols.length} column${cols.length === 1 ? '' : 's'}</div>`
+      : `<div class="table-hint">${v.rows.length} row${v.rows.length === 1 ? '' : 's'} · ${cols.length} column${cols.length === 1 ? '' : 's'}</div>`;
+    return `${hint}<div class="table-scroll"><table class="data-table">${head}${body}</table></div>`;
+  }
+  const rows = v.entries.map(([k, val]) => {
+    const f = formatCellShort(val);
+    return `<tr><td class="key">${escapeHTML(k)}</td><td class="${f.cls}" title="${escapeHTML(formatCellFull(val))}">${escapeHTML(f.text)}</td></tr>`;
+  }).join('');
+  return `<div class="table-hint">${v.entries.length} propert${v.entries.length === 1 ? 'y' : 'ies'}</div><div class="table-scroll"><table class="data-table"><tr><th>Key</th><th>Value</th></tr>${rows}</table></div>`;
+}
 
 function loadEndpoints() {
   try { return JSON.parse(localStorage.getItem(LS_ENDPOINTS) || '[]'); }
@@ -432,8 +509,15 @@ function render() {
   container.innerHTML = state.endpoints.map(ep => {
     const status = statusOf(ep);
     const open = state.openId === ep.id ? 'open' : '';
-    const preview = ep.response !== undefined && ep.response !== null
-      ? `<div class="preview">${escapeHTML(JSON.stringify(ep.response, null, 2))}</div>`
+    const hasResp = ep.response !== undefined && ep.response !== null;
+    const preview = hasResp
+      ? `<div class="preview-wrap">
+           <div class="preview-tabs" title="Switch between raw JSON and a table view">
+             <button data-action="view-mode" data-view="raw" class="${state.viewMode === 'raw' ? 'active' : ''}">Raw</button>
+             <button data-action="view-mode" data-view="table" class="${state.viewMode === 'table' ? 'active' : ''}">Table</button>
+           </div>
+           ${state.viewMode === 'table' ? renderTableView(ep.response) : `<div class="preview">${escapeHTML(JSON.stringify(ep.response, null, 2))}</div>`}
+         </div>`
       : `<div class="preview empty">No response yet. Describe the data below and click Generate.</div>`;
     const badgeTitle = status === 'approved'
       ? 'Live — this mock is being served to your app'
@@ -527,6 +611,14 @@ document.getElementById('endpoints').addEventListener('click', async (e) => {
     saveEndpoints();
     render();
     toast('Approved — mock is live', 'success');
+    return;
+  }
+  if (action === 'view-mode') {
+    const v = e.target.closest('[data-view]')?.dataset.view;
+    if (!v) return;
+    state.viewMode = v;
+    localStorage.setItem(LS_VIEW_MODE, v);
+    render();
     return;
   }
   if (action === 'copy-fetch') {
